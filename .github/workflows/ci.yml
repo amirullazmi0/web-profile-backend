@@ -21,7 +21,7 @@ jobs:
           name: Go build, vet and test
           runs-on: ubuntu-latest
           steps:
-               - uses: actions/checkout@v5
+               - uses: actions/checkout@v7
 
                - uses: actions/setup-go@v6
                  with:
@@ -51,7 +51,7 @@ jobs:
           name: Swagger docs are up to date
           runs-on: ubuntu-latest
           steps:
-               - uses: actions/checkout@v5
+               - uses: actions/checkout@v7
 
                - uses: actions/setup-go@v6
                  with:
@@ -71,7 +71,7 @@ jobs:
           env:
                DATABASE_URL: postgres://ci:ci@localhost:5432/ci
           steps:
-               - uses: actions/checkout@v5
+               - uses: actions/checkout@v7
 
                - uses: actions/setup-node@v4
                  with:
@@ -93,7 +93,7 @@ jobs:
           name: govulncheck
           runs-on: ubuntu-latest
           steps:
-               - uses: actions/checkout@v5
+               - uses: actions/checkout@v7
 
                - uses: actions/setup-go@v6
                  with:
