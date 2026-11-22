@@ -1,0 +1,133 @@
+name: CI
+
+on:
+     pull_request:
+          branches: [main, staging, development]
+     push:
+          branches: [main, staging, development]
+
+concurrency:
+     group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+     cancel-in-progress: true
+
+permissions:
+     contents: read
+
+env:
+     GO_VERSION: "1.25.x"
+
+jobs:
+     go:
+          name: Go build, vet and test
+          runs-on: ubuntu-latest
+          steps:
+               - uses: actions/checkout@v5
+
+               - uses: actions/setup-go@v6
+                 with:
+                      go-version: ${{ env.GO_VERSION }}
+                      check-latest: true
+                      cache: true
+
+               - name: Download dependencies
+                 run: go mod download
+
+               - name: Verify go.mod is tidy
+                 run: |
+                      go mod tidy
+                      git diff --exit-code -- go.mod go.sum \
+                        || { echo "::error::go.mod/go.sum are not tidy. Run 'go mod tidy' and commit the result."; exit 1; }
+
+               - name: Vet
+                 run: go vet ./...
+
+               - name: Build
+                 run: go build ./...
+
+               - name: Test
+                 run: go test -race ./...
+
+     swagger:
+          name: Swagger docs are up to date
+          runs-on: ubuntu-latest
+          steps:
+               - uses: actions/checkout@v5
+
+               - uses: actions/setup-go@v6
+                 with:
+                      go-version: ${{ env.GO_VERSION }}
+                      check-latest: true
+                      cache: true
+
+               - name: Regenerate and diff
+                 run: |
+                      go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -o docs
+                      git diff --exit-code -- docs \
+                        || { echo "::error::docs/ is stale. Run 'make swagger' and commit the result."; exit 1; }
+
+     prisma:
+          name: Prisma schema
+          runs-on: ubuntu-latest
+          env:
+               DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+          steps:
+               - uses: actions/checkout@v5
+
+               - uses: actions/setup-node@v4
+                 with:
+                      node-version: "22"
+                      cache: npm
+
+               - run: npm ci
+
+               - name: Validate schema
+                 run: npm run prisma:validate
+
+               - name: Check schema formatting
+                 run: |
+                      npm run prisma:format
+                      git diff --exit-code -- prisma/schema.prisma \
+                        || { echo "::error::prisma/schema.prisma is not formatted. Run 'npm run prisma:format' and commit the result."; exit 1; }
+
+     vulncheck:
+          name: govulncheck
+          runs-on: ubuntu-latest
+          steps:
+               - uses: actions/checkout@v5
+
+               - uses: actions/setup-go@v6
+                 with:
+                      go-version: ${{ env.GO_VERSION }}
+                      check-latest: true
+                      cache: true
+
+               - name: govulncheck
+                 env:
+                      # Space separated OSV ids that are known and accepted.
+                      ALLOWED: ""
+                 run: |
+                      go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -format json ./... > vuln.json
+                      called=$(jq -r 'select(.finding != null and .finding.trace[0].function != null) | .finding.osv' vuln.json | sort -u)
+                      echo "Called vulnerabilities: ${called:-none}"
+                      blocking=$(comm -23 <(echo "$called" | sed '/^$/d') <(printf '%s\n' $ALLOWED | sort -u))
+                      if [ -n "$blocking" ]; then
+                        go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./... || true
+                        echo "::error::Unallowed vulnerabilities: $blocking"
+                        exit 1
+                      fi
+
+     deploy-staging:
+          if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+          needs: [go, swagger, prisma, vulncheck]
+          uses: ./.github/workflows/deploy.yml
+          with:
+               environment: staging
+          secrets: inherit
+
+     deploy-production:
+          if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+          needs: [go, swagger, prisma, vulncheck]
+          uses: ./.github/workflows/deploy.yml
+          with:
+               environment: production
+          secrets: inherit

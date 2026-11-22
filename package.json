@@ -1,0 +1,26 @@
+{
+     "name": "web-profile-backend",
+     "version": "1.0.0",
+     "private": true,
+     "description": "Web Profile backend: Gin + clean architecture. Prisma is used only for schema and migrations.",
+     "scripts": {
+          "migrate:dev": "prisma migrate dev",
+          "migrate:deploy": "prisma migrate deploy",
+          "migrate:reset": "prisma migrate reset",
+          "db:push": "prisma db push",
+          "db:pull": "prisma db pull",
+          "db:seed": "go run main.go -seed",
+          "studio": "prisma studio",
+          "prisma:validate": "prisma validate",
+          "prisma:format": "prisma format",
+          "deploy:vps": "caprover deploy"
+     },
+     "license": "UNLICENSED",
+     "type": "commonjs",
+     "devDependencies": {
+          "prisma": "^7.1.0"
+     },
+     "dependencies": {
+          "dotenv": "^17.2.3"
+     }
+}

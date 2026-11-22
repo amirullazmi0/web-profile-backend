@@ -1,0 +1,30 @@
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  USER
+}
+
+// User model
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String    @unique @db.VarChar(255)
+  password     String    @db.VarChar(255)
+  name         String    @db.VarChar(255)
+  role         UserRole  @default(USER)
+  avatar       String?   @db.Text
+  refreshToken String?   @map("refresh_token") @db.Text
+  tokenExpiry  DateTime? @map("token_expiry")
+  isActive     Boolean   @default(false) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedBy    String?   @map("updated_by") @db.Uuid
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+
+  @@map("users")
+}
